@@ -1,0 +1,1 @@
+# Snowflake-Data-Vault-Validation-Tool
