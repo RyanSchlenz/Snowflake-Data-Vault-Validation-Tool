@@ -101,7 +101,13 @@ def extract_missing_records(session, config, limit=10):
         try:
             # Get source and target table names for reference
             source_table = config.get('source_table', 'UNKNOWN_SOURCE')
-            hub_table = config.get('hub_table', 'UNKNOWN_HUB')
+            
+            # Handle both single hub_table and multiple hub_tables
+            if 'hub_tables' in config:
+                hub_table = ', '.join(config['hub_tables'])
+            else:
+                hub_table = config.get('hub_table', 'UNKNOWN_HUB')
+                
             satellite_table = config.get('cur_satellite_table', 'UNKNOWN_SATELLITE')
             bizview_table = config.get('bizview_table', 'UNKNOWN_BIZVIEW')
             
@@ -115,6 +121,7 @@ def extract_missing_records(session, config, limit=10):
                 missing_count = 0
             
             # Modify query to use TO_JSON for direct JSON conversion
+            # Add ORDER BY to ensure records from the same table are grouped together
             json_query = f"""
             WITH missing_records AS (
                 {config['custom_except_query']}
@@ -269,7 +276,13 @@ def main(session: snowpark.Session):
             # Extract table identifiers
             table_name = config.get('source_table', '').split('.')[-1]
             source_table = config.get('source_table')
-            hub_table = config.get('hub_table', '')
+            
+            # Handle both single hub_table and multiple hub_tables
+            if 'hub_tables' in config:
+                hub_table = ', '.join(config['hub_tables'])
+            else:
+                hub_table = config.get('hub_table', '')
+                
             satellite_table = config.get('cur_satellite_table', '')
             bizview_table = config.get('bizview_table', '')
             
@@ -330,7 +343,7 @@ def main(session: snowpark.Session):
             # Calculate total rows lost (excluding deleted records)
             total_rows_lost = source_hub_loss + hub_to_link_loss + hub_to_sat_loss + link_to_sat_loss + sat_to_bizview_loss
             
-            # Append results
+            # Append results (without ROWS_CHANGED)
             results.append((
                 table_name,
                 source_table,
@@ -370,7 +383,7 @@ def main(session: snowpark.Session):
             bizview_table = result[4]
             source_count = result[5]
             total_lost = result[15]   # TOTAL_ROWS_LOST column
-            deleted = result[16]      # DELETED_RECORDS column
+            deleted = result[16]      # DELETED_RECORDS column (index adjusted after removing ROWS_CHANGED)
             
             # Calculate actual sample size (subtract note record if it exists)
             sample_size = len(lost_records[table_name]['source_to_hub'])
